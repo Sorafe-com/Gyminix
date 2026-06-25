@@ -1,22 +1,44 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { useToast } from 'vue-toastification'
 import { gymsApi } from '@/api/gyms'
+import { useDebounce } from '@/composables/useDebounce'
 
 const toast = useToast()
-const gyms  = ref([])
-const meta  = ref({})
-const filters = ref({ search: '', status: '', page: 1, per_page: 15 })
+const gyms    = ref([])
+const meta    = ref({})
 const loading = ref(false)
-const showModal = ref(false)
-const editMode  = ref(false)
-const form = ref({})
-const saving = ref(false)
+const dialog  = ref(false)
+const editMode = ref(false)
+const saving   = ref(false)
+const form     = ref({})
+
+const searchQuery     = ref('')
+const statusFilter    = ref(null)
+const page            = ref(1)
+const perPage         = ref(15)
+const debouncedSearch = useDebounce(searchQuery, 500)
+
+const headers = [
+  { title: '#',       key: 'id',       width: '60px' },
+  { title: 'Nombre',  key: 'name'  },
+  { title: 'Email',   key: 'email' },
+  { title: 'Moneda',  key: 'currency', width: '100px' },
+  { title: 'Estado',  key: 'status',   align: 'center', width: '110px' },
+  { title: 'Acciones', key: 'actions', sortable: false, align: 'center', width: '100px' },
+]
+
+watch([debouncedSearch, statusFilter], () => { page.value = 1; load() })
 
 async function load() {
   loading.value = true
   try {
-    const { data } = await gymsApi.list(filters.value)
+    const { data } = await gymsApi.list({
+      search:   debouncedSearch.value,
+      status:   statusFilter.value ?? '',
+      page:     page.value,
+      per_page: perPage.value,
+    })
     gyms.value = data.data
     meta.value = data.meta
   } finally { loading.value = false }
@@ -25,13 +47,13 @@ async function load() {
 function openCreate() {
   form.value = { name: '', legal_name: '', tax_id: '', address: '', phone: '', email: '', website: '', currency: 'PEN', currency_symbol: 'S/', timezone: 'America/Lima', language: 'es', status: 1 }
   editMode.value = false
-  showModal.value = true
+  dialog.value   = true
 }
 
 function openEdit(gym) {
   form.value = { ...gym }
   editMode.value = true
-  showModal.value = true
+  dialog.value   = true
 }
 
 async function save() {
@@ -44,7 +66,7 @@ async function save() {
       await gymsApi.create(form.value)
       toast.success('Gimnasio creado')
     }
-    showModal.value = false
+    dialog.value = false
     load()
   } catch (e) {
     toast.error(e.response?.data?.message || 'Error al guardar')
@@ -62,91 +84,125 @@ onMounted(load)
 
 <template>
   <div>
-    <div class="page-header">
-      <h2><i class="fa fa-building me-2 text-primary"></i> Gimnasios</h2>
-      <button class="btn btn-primary btn-sm" @click="openCreate">
-        <i class="fa fa-plus me-1"></i> Nuevo Gimnasio
-      </button>
-    </div>
-
-    <div class="filter-bar">
-      <input v-model="filters.search" @input="filters.page=1;load()" class="form-control form-control-sm" placeholder="Buscar..." />
-      <select v-model="filters.status" @change="filters.page=1;load()" class="form-select form-select-sm">
-        <option value="">Todos los estados</option>
-        <option value="1">Activo</option>
-        <option value="0">Inactivo</option>
-      </select>
-    </div>
-
-    <div class="data-table">
-      <table>
-        <thead>
-          <tr>
-            <th>#</th><th>Nombre</th><th>Email</th><th>Moneda</th><th>Estado</th><th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="loading"><td colspan="6" class="text-center py-4"><span class="spinner-sm" style="border-top-color:#1a73e8"></span></td></tr>
-          <tr v-else-if="!gyms.length"><td colspan="6" class="text-center py-4 text-muted-sm">Sin resultados</td></tr>
-          <tr v-for="gym in gyms" :key="gym.id" v-else>
-            <td>{{ gym.id }}</td>
-            <td><strong>{{ gym.name }}</strong><br><small class="text-muted-sm">{{ gym.legal_name }}</small></td>
-            <td>{{ gym.email }}</td>
-            <td>{{ gym.currency_symbol }} {{ gym.currency }}</td>
-            <td><span :class="gym.status ? 'badge-active' : 'badge-inactive'">{{ gym.status ? 'Activo' : 'Inactivo' }}</span></td>
-            <td>
-              <button class="icon-btn" title="Editar" @click="openEdit(gym)"><i class="fa fa-edit"></i></button>
-              <button class="icon-btn" :title="gym.status ? 'Desactivar' : 'Activar'" @click="toggleStatus(gym)">
-                <i :class="gym.status ? 'fa fa-toggle-on text-success' : 'fa fa-toggle-off text-muted'"></i>
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <div class="pagination-bar">
-        <span>Total: {{ meta.total || 0 }} gimnasios</span>
-        <div class="d-flex gap-2">
-          <button class="btn btn-outline-secondary btn-sm" :disabled="filters.page<=1" @click="filters.page--;load()">‹ Anterior</button>
-          <span>Página {{ filters.page }} / {{ meta.pages || 1 }}</span>
-          <button class="btn btn-outline-secondary btn-sm" :disabled="filters.page>=meta.pages" @click="filters.page++;load()">Siguiente ›</button>
-        </div>
+    <!-- Header -->
+    <div class="d-flex align-center mb-6">
+      <div>
+        <h2 class="text-h5 font-weight-bold">Gimnasios</h2>
+        <p class="text-body-2 text-medium-emphasis mb-0">Gestión de gimnasios registrados</p>
       </div>
+      <v-spacer />
+      <v-btn prepend-icon="mdi-plus" @click="openCreate">Nuevo Gimnasio</v-btn>
     </div>
 
-    <!-- Modal -->
-    <div v-if="showModal" class="modal-overlay" @click.self="showModal=false">
-      <div class="modal-box">
-        <div class="modal-header">
-          <span>{{ editMode ? 'Editar Gimnasio' : 'Nuevo Gimnasio' }}</span>
-          <button class="icon-btn" @click="showModal=false"><i class="fa fa-times"></i></button>
-        </div>
-        <div class="modal-body">
-          <div class="row g-3">
-            <div class="col-6"><label class="form-label">Nombre comercial *</label><input v-model="form.name" class="form-control" /></div>
-            <div class="col-6"><label class="form-label">Razón social</label><input v-model="form.legal_name" class="form-control" /></div>
-            <div class="col-6"><label class="form-label">RUC / NIT</label><input v-model="form.tax_id" class="form-control" /></div>
-            <div class="col-6"><label class="form-label">Teléfono</label><input v-model="form.phone" class="form-control" /></div>
-            <div class="col-12"><label class="form-label">Dirección</label><input v-model="form.address" class="form-control" /></div>
-            <div class="col-6"><label class="form-label">Email</label><input v-model="form.email" type="email" class="form-control" /></div>
-            <div class="col-6"><label class="form-label">Sitio web</label><input v-model="form.website" class="form-control" /></div>
-            <div class="col-4"><label class="form-label">Moneda</label><input v-model="form.currency" class="form-control" /></div>
-            <div class="col-4"><label class="form-label">Símbolo</label><input v-model="form.currency_symbol" class="form-control" /></div>
-            <div class="col-4">
-              <label class="form-label">Estado</label>
-              <select v-model="form.status" class="form-select">
-                <option :value="1">Activo</option><option :value="0">Inactivo</option>
-              </select>
-            </div>
+    <!-- Filters -->
+    <v-card class="mb-4 pa-4" elevation="0" border>
+      <v-row dense>
+        <v-col cols="12" sm="5" md="4">
+          <v-text-field
+            v-model="searchQuery"
+            prepend-inner-icon="mdi-magnify"
+            placeholder="Buscar gimnasio..."
+            clearable
+          />
+        </v-col>
+        <v-col cols="12" sm="4" md="3">
+          <v-select
+            v-model="statusFilter"
+            :items="[{ title: 'Todos', value: null }, { title: 'Activo', value: 1 }, { title: 'Inactivo', value: 0 }]"
+            item-title="title"
+            item-value="value"
+            placeholder="Estado"
+          />
+        </v-col>
+      </v-row>
+    </v-card>
+
+    <!-- Table -->
+    <v-card elevation="0" border>
+      <v-data-table
+        :headers="headers"
+        :items="gyms"
+        :loading="loading"
+        :items-per-page="-1"
+        hover
+      >
+        <template #item.name="{ item }">
+          <div class="py-1">
+            <div class="font-weight-medium">{{ item.name }}</div>
+            <div class="text-caption text-medium-emphasis">{{ item.legal_name }}</div>
           </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-light" @click="showModal=false">Cancelar</button>
-          <button class="btn btn-primary" :disabled="saving" @click="save">
-            <span v-if="saving" class="spinner-sm me-1"></span>
-            {{ saving ? 'Guardando...' : 'Guardar' }}
-          </button>
-        </div>
-      </div>
-    </div>
+        </template>
+        <template #item.currency="{ item }">
+          {{ item.currency_symbol }} {{ item.currency }}
+        </template>
+        <template #item.status="{ item }">
+          <v-chip :color="item.status ? 'success' : 'error'" variant="tonal" size="small">
+            {{ item.status ? 'Activo' : 'Inactivo' }}
+          </v-chip>
+        </template>
+        <template #item.actions="{ item }">
+          <v-btn icon="mdi-pencil-outline" variant="text" size="small" density="compact" @click="openEdit(item)" />
+          <v-btn
+            :icon="item.status ? 'mdi-toggle-switch' : 'mdi-toggle-switch-off-outline'"
+            :color="item.status ? 'success' : undefined"
+            variant="text"
+            size="small"
+            density="compact"
+            @click="toggleStatus(item)"
+          />
+        </template>
+        <template #bottom>
+          <v-divider />
+          <div class="d-flex align-center justify-space-between pa-3">
+            <span class="text-caption text-medium-emphasis">Total: {{ meta.total || 0 }} gimnasios</span>
+            <v-pagination
+              v-model="page"
+              :length="meta.pages || 1"
+              density="compact"
+              @update:model-value="load"
+            />
+          </div>
+        </template>
+        <template #no-data>
+          <div class="text-center py-8 text-medium-emphasis">Sin resultados</div>
+        </template>
+      </v-data-table>
+    </v-card>
+
+    <!-- Dialog -->
+    <v-dialog v-model="dialog" max-width="560">
+      <v-card>
+        <v-card-title class="pa-5 pb-3">{{ editMode ? 'Editar Gimnasio' : 'Nuevo Gimnasio' }}</v-card-title>
+        <v-divider />
+        <v-card-text class="pa-5">
+          <v-row dense>
+            <v-col cols="6"><v-text-field v-model="form.name" label="Nombre comercial *" /></v-col>
+            <v-col cols="6"><v-text-field v-model="form.legal_name" label="Razón social" /></v-col>
+            <v-col cols="6"><v-text-field v-model="form.tax_id" label="RUC / NIT" /></v-col>
+            <v-col cols="6"><v-text-field v-model="form.phone" label="Teléfono" /></v-col>
+            <v-col cols="12"><v-text-field v-model="form.address" label="Dirección" /></v-col>
+            <v-col cols="6"><v-text-field v-model="form.email" label="Email" type="email" /></v-col>
+            <v-col cols="6"><v-text-field v-model="form.website" label="Sitio web" /></v-col>
+            <v-col cols="4"><v-text-field v-model="form.currency" label="Moneda" /></v-col>
+            <v-col cols="4"><v-text-field v-model="form.currency_symbol" label="Símbolo" /></v-col>
+            <v-col cols="4">
+              <v-select
+                v-model="form.status"
+                :items="[{ title: 'Activo', value: 1 }, { title: 'Inactivo', value: 0 }]"
+                item-title="title"
+                item-value="value"
+                label="Estado"
+              />
+            </v-col>
+          </v-row>
+        </v-card-text>
+        <v-divider />
+        <v-card-actions class="pa-4">
+          <v-spacer />
+          <v-btn variant="text" color="default" @click="dialog = false">Cancelar</v-btn>
+          <v-btn :loading="saving" @click="save">{{ editMode ? 'Actualizar' : 'Crear' }}</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>

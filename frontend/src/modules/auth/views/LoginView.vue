@@ -8,9 +8,10 @@ const router    = useRouter()
 const authStore = useAuthStore()
 const toast     = useToast()
 
-const form    = ref({ email: '', password: '', remember: false })
-const loading = ref(false)
-const error   = ref('')
+const form     = ref({ email: '', password: '', remember: false })
+const loading  = ref(false)
+const error    = ref('')
+const showPass = ref(false)
 
 async function handleLogin() {
   error.value   = ''
@@ -32,45 +33,79 @@ async function handleLogin() {
 </script>
 
 <template>
-  <div class="login-page">
-    <div class="login-card">
-      <div class="login-logo">
-        <div style="font-size:2.5rem;color:#1a73e8"><i class="fa fa-dumbbell"></i></div>
-        <h1>Gyminix</h1>
-        <p>Sistema de Gestión de Gimnasios</p>
-      </div>
-
-      <form @submit.prevent="handleLogin">
-        <div class="mb-3">
-          <label class="form-label">Correo electrónico</label>
-          <input v-model="form.email" type="email" class="form-control" placeholder="usuario@email.com" required autofocus />
+  <div class="auth-wrapper">
+    <v-card width="420" rounded="xl" elevation="12">
+      <!-- Logo -->
+      <v-card-text class="text-center pt-10 pb-2">
+        <div class="d-flex align-center justify-center ga-2 mb-3">
+          <v-icon icon="mdi-dumbbell" color="primary" size="40" />
+          <span class="text-h4 font-weight-bold text-primary">Gyminix</span>
         </div>
+        <p class="text-body-2 text-medium-emphasis mb-0">Sistema de Gestión de Gimnasios</p>
+      </v-card-text>
 
-        <div class="mb-3">
-          <label class="form-label">Contraseña</label>
-          <input v-model="form.password" type="password" class="form-control" placeholder="••••••••" required />
-        </div>
+      <v-divider class="mx-6 mt-2 mb-1" />
 
-        <div class="mb-4 d-flex align-items-center justify-content-between">
-          <div class="form-check">
-            <input v-model="form.remember" type="checkbox" class="form-check-input" id="remember" />
-            <label class="form-check-label text-muted-sm" for="remember">Recordarme</label>
-          </div>
-        </div>
+      <v-card-text class="px-8 py-6">
+        <h2 class="text-h6 font-weight-semibold mb-1">Bienvenido de vuelta 👋</h2>
+        <p class="text-body-2 text-medium-emphasis mb-6">Inicia sesión para continuar</p>
 
-        <div v-if="error" class="alert alert-danger py-2 text-sm mb-3" style="font-size:.85rem">
-          <i class="fa fa-exclamation-circle me-1"></i> {{ error }}
-        </div>
+        <!-- Error alert -->
+        <v-alert
+          v-if="error"
+          type="error"
+          variant="tonal"
+          density="compact"
+          class="mb-4 slide-down"
+          :text="error"
+          closable
+          @click:close="error = ''"
+        />
 
-        <button type="submit" class="btn btn-primary w-100" :disabled="loading">
-          <span v-if="loading" class="spinner-sm me-2"></span>
-          {{ loading ? 'Ingresando...' : 'Iniciar Sesión' }}
-        </button>
-      </form>
+        <v-form @submit.prevent="handleLogin">
+          <v-text-field
+            v-model="form.email"
+            label="Correo electrónico"
+            type="email"
+            prepend-inner-icon="mdi-email-outline"
+            class="mb-3"
+            autofocus
+            required
+          />
 
-      <p class="text-center text-muted-sm mt-4" style="margin-bottom:0">
-        Gyminix &copy; {{ new Date().getFullYear() }}
-      </p>
-    </div>
+          <v-text-field
+            v-model="form.password"
+            label="Contraseña"
+            :type="showPass ? 'text' : 'password'"
+            prepend-inner-icon="mdi-lock-outline"
+            :append-inner-icon="showPass ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+            class="mb-3"
+            required
+            @click:append-inner="showPass = !showPass"
+          />
+
+          <v-checkbox
+            v-model="form.remember"
+            label="Recordarme"
+            class="mb-4"
+          />
+
+          <v-btn
+            type="submit"
+            block
+            size="large"
+            :loading="loading"
+          >
+            Iniciar Sesión
+          </v-btn>
+        </v-form>
+      </v-card-text>
+
+      <v-card-text class="text-center py-4">
+        <span class="text-caption text-medium-emphasis">
+          Gyminix &copy; {{ new Date().getFullYear() }}
+        </span>
+      </v-card-text>
+    </v-card>
   </div>
 </template>

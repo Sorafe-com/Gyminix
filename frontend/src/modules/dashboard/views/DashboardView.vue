@@ -8,6 +8,29 @@ const stats     = ref({ gyms: 0, branches: 0, users: 0, roles: 0 })
 const logs      = ref([])
 const loading   = ref(true)
 
+const cards = [
+  { key: 'gyms',     label: 'Gimnasios',  icon: 'mdi-domain',      color: 'primary' },
+  { key: 'branches', label: 'Sucursales', icon: 'mdi-map-marker',   color: 'success' },
+  { key: 'users',    label: 'Usuarios',   icon: 'mdi-account-group', color: 'error' },
+  { key: 'roles',    label: 'Roles',      icon: 'mdi-shield-check',  color: 'warning' },
+]
+
+const logHeaders = [
+  { title: 'Usuario',     key: 'user',        sortable: false },
+  { title: 'Módulo',      key: 'module',      sortable: false },
+  { title: 'Acción',      key: 'action',      sortable: false },
+  { title: 'Descripción', key: 'description', sortable: false },
+  { title: 'Hace',        key: 'time',        sortable: false },
+]
+
+function timeAgo(dateStr) {
+  const diff = Math.floor((Date.now() - new Date(dateStr)) / 1000)
+  if (diff < 60)    return 'hace un momento'
+  if (diff < 3600)  return `hace ${Math.floor(diff / 60)} min`
+  if (diff < 86400) return `hace ${Math.floor(diff / 3600)} h`
+  return `hace ${Math.floor(diff / 86400)} días`
+}
+
 onMounted(async () => {
   try {
     const { data } = await api.get('/dashboard')
@@ -19,73 +42,72 @@ onMounted(async () => {
     loading.value = false
   }
 })
-
-const cards = [
-  { key: 'gyms',     label: 'Gimnasios',  icon: 'fa fa-building',  color: '#1a73e8', bg: '#e8f0fe' },
-  { key: 'branches', label: 'Sucursales', icon: 'fa fa-map-marker', color: '#34a853', bg: '#e6f4ea' },
-  { key: 'users',    label: 'Usuarios',   icon: 'fa fa-users',      color: '#ea4335', bg: '#fce8e6' },
-  { key: 'roles',    label: 'Roles',      icon: 'fa fa-shield',     color: '#fbbc04', bg: '#fef7e0' },
-]
-
-function timeAgo(dateStr) {
-  const diff = Math.floor((Date.now() - new Date(dateStr)) / 1000)
-  if (diff < 60)   return 'hace un momento'
-  if (diff < 3600) return `hace ${Math.floor(diff/60)} min`
-  if (diff < 86400)return `hace ${Math.floor(diff/3600)} h`
-  return `hace ${Math.floor(diff/86400)} días`
-}
 </script>
 
 <template>
   <div>
-    <div class="page-header">
-      <h2><i class="fa fa-home me-2 text-primary"></i> Dashboard</h2>
-      <span class="text-muted-sm">Bienvenido, {{ authStore.user?.first_name }}</span>
+    <!-- Page header -->
+    <div class="mb-6">
+      <h2 class="text-h5 font-weight-bold mb-1">Dashboard</h2>
+      <p class="text-body-2 text-medium-emphasis mb-0">
+        Bienvenido, <strong>{{ authStore.user?.first_name }}</strong>
+      </p>
     </div>
 
     <!-- Stat cards -->
-    <div class="row g-3 mb-4">
-      <div v-for="card in cards" :key="card.key" class="col-sm-6 col-xl-3">
-        <div class="card-stat">
-          <div class="card-stat-icon" :style="`background:${card.bg};color:${card.color}`">
-            <i :class="card.icon"></i>
-          </div>
-          <div>
-            <h3>{{ loading ? '—' : stats[card.key] }}</h3>
-            <p>{{ card.label }}</p>
-          </div>
-        </div>
-      </div>
-    </div>
+    <v-row class="mb-6">
+      <v-col v-for="card in cards" :key="card.key" cols="12" sm="6" xl="3">
+        <v-card elevation="0" border>
+          <v-card-text class="d-flex align-center ga-4 pa-5">
+            <v-avatar :color="card.color" variant="tonal" size="52" rounded="lg">
+              <v-icon :icon="card.icon" size="24" />
+            </v-avatar>
+            <div>
+              <div class="text-h4 font-weight-bold">
+                <v-skeleton-loader v-if="loading" type="text" width="40" />
+                <span v-else>{{ stats[card.key] }}</span>
+              </div>
+              <div class="text-body-2 text-medium-emphasis">{{ card.label }}</div>
+            </div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
 
     <!-- Recent activity -->
-    <div class="data-table">
-      <div class="p-3 border-bottom d-flex align-items-center">
-        <i class="fa fa-history me-2 text-primary"></i>
-        <strong>Actividad reciente</strong>
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Usuario</th>
-            <th>Módulo</th>
-            <th>Acción</th>
-            <th>Descripción</th>
-            <th>Hace</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="loading"><td colspan="5" class="text-center py-4"><span class="spinner-sm" style="border-top-color:#1a73e8"></span></td></tr>
-          <tr v-else-if="!logs.length"><td colspan="5" class="text-center py-4 text-muted-sm">Sin actividad reciente</td></tr>
-          <tr v-for="log in logs" :key="log.id" v-else>
-            <td>{{ log.first_name }} {{ log.last_name }}</td>
-            <td><span class="badge bg-light text-dark">{{ log.module }}</span></td>
-            <td><span class="badge bg-primary">{{ log.action }}</span></td>
-            <td>{{ log.description }}</td>
-            <td class="text-muted-sm">{{ timeAgo(log.created_at) }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <v-card elevation="0" border>
+      <v-card-title class="pa-5 pb-3 d-flex align-center ga-2">
+        <v-icon icon="mdi-history" color="primary" />
+        Actividad reciente
+      </v-card-title>
+      <v-divider />
+      <v-data-table
+        :headers="logHeaders"
+        :items="logs"
+        :loading="loading"
+        hover
+        hide-default-footer
+        :items-per-page="-1"
+      >
+        <template #item.user="{ item }">
+          {{ item.first_name }} {{ item.last_name }}
+        </template>
+        <template #item.module="{ item }">
+          <v-chip size="x-small" variant="tonal">{{ item.module }}</v-chip>
+        </template>
+        <template #item.action="{ item }">
+          <v-chip size="x-small" color="primary" variant="tonal">{{ item.action }}</v-chip>
+        </template>
+        <template #item.time="{ item }">
+          <span class="text-caption text-medium-emphasis">{{ timeAgo(item.created_at) }}</span>
+        </template>
+        <template #no-data>
+          <div class="text-center py-8 text-medium-emphasis">
+            <v-icon icon="mdi-history" size="40" class="mb-2 d-block" />
+            Sin actividad reciente
+          </div>
+        </template>
+      </v-data-table>
+    </v-card>
   </div>
 </template>

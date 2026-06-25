@@ -1,47 +1,63 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { useToast } from 'vue-toastification'
 import { branchesApi } from '@/api/branches'
+import { useDebounce } from '@/composables/useDebounce'
 
-const toast = useToast()
-const branches  = ref([])
-const meta      = ref({})
-const filters   = ref({ search: '', status: '', page: 1, per_page: 15 })
-const loading   = ref(false)
-const showModal = ref(false)
-const editMode  = ref(false)
-const form      = ref({})
-const saving    = ref(false)
+const toast    = useToast()
+const branches = ref([])
+const meta     = ref({})
+const loading  = ref(false)
+const dialog   = ref(false)
+const editMode = ref(false)
+const saving   = ref(false)
+const form     = ref({})
 
-const defaultSchedule = {
-  lunes: { open: '06:00', close: '22:00', active: true },
-  martes: { open: '06:00', close: '22:00', active: true },
-  miercoles: { open: '06:00', close: '22:00', active: true },
-  jueves: { open: '06:00', close: '22:00', active: true },
-  viernes: { open: '06:00', close: '22:00', active: true },
-  sabado: { open: '08:00', close: '20:00', active: true },
-  domingo: { open: '08:00', close: '14:00', active: false },
+const searchQuery     = ref('')
+const statusFilter    = ref(null)
+const page            = ref(1)
+const perPage         = ref(15)
+const debouncedSearch = useDebounce(searchQuery, 500)
+
+const scheduleKeys = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo']
+const dayLabels    = {
+  lunes: 'Lunes', martes: 'Martes', miercoles: 'Miércoles',
+  jueves: 'Jueves', viernes: 'Viernes', sabado: 'Sábado', domingo: 'Domingo',
 }
+
+const defaultSchedule = () =>
+  Object.fromEntries(scheduleKeys.map(d => [d, { open: '06:00', close: '22:00', active: true }]))
+
+const headers = [
+  { title: 'Nombre',    key: 'name' },
+  { title: 'Dirección', key: 'address', sortable: false },
+  { title: 'Teléfono',  key: 'phone',   sortable: false, width: '130px' },
+  { title: 'Estado',    key: 'status',  align: 'center', width: '110px' },
+  { title: 'Acciones',  key: 'actions', sortable: false, align: 'center', width: '120px' },
+]
+
+watch([debouncedSearch, statusFilter], () => { page.value = 1; load() })
 
 async function load() {
   loading.value = true
   try {
-    const { data } = await branchesApi.list(filters.value)
+    const { data } = await branchesApi.list({
+      search: debouncedSearch.value, status: statusFilter.value ?? '',
+      page: page.value, per_page: perPage.value,
+    })
     branches.value = data.data
     meta.value     = data.meta
   } finally { loading.value = false }
 }
 
 function openCreate() {
-  form.value = { name: '', address: '', phone: '', email: '', schedule: { ...defaultSchedule }, status: 1 }
-  editMode.value = false
-  showModal.value = true
+  form.value = { name: '', address: '', phone: '', email: '', description: '', status: 1, schedule: defaultSchedule() }
+  editMode.value = false; dialog.value = true
 }
 
 function openEdit(branch) {
-  form.value = { ...branch, schedule: branch.schedule ? (typeof branch.schedule === 'string' ? JSON.parse(branch.schedule) : branch.schedule) : { ...defaultSchedule } }
-  editMode.value = true
-  showModal.value = true
+  form.value = { ...branch, schedule: { ...defaultSchedule(), ...(branch.schedule || {}) } }
+  editMode.value = true; dialog.value = true
 }
 
 async function save() {
@@ -54,8 +70,7 @@ async function save() {
       await branchesApi.create(form.value)
       toast.success('Sucursal creada')
     }
-    showModal.value = false
-    load()
+    dialog.value = false; load()
   } catch (e) {
     toast.error(e.response?.data?.message || 'Error al guardar')
   } finally { saving.value = false }
@@ -63,15 +78,13 @@ async function save() {
 
 async function toggleStatus(branch) {
   await branchesApi.toggleStatus(branch.id)
-  toast.success('Estado actualizado')
-  load()
+  toast.success('Estado actualizado'); load()
 }
 
 async function deleteBranch(branch) {
   if (!confirm(`¿Eliminar sucursal "${branch.name}"?`)) return
   await branchesApi.delete(branch.id)
-  toast.success('Sucursal eliminada')
-  load()
+  toast.success('Sucursal eliminada'); load()
 }
 
 onMounted(load)
@@ -79,89 +92,138 @@ onMounted(load)
 
 <template>
   <div>
-    <div class="page-header">
-      <h2><i class="fa fa-map-marker me-2 text-primary"></i> Sucursales</h2>
-      <button class="btn btn-primary btn-sm" @click="openCreate"><i class="fa fa-plus me-1"></i> Nueva Sucursal</button>
-    </div>
-
-    <div class="filter-bar">
-      <input v-model="filters.search" @input="filters.page=1;load()" class="form-control form-control-sm" placeholder="Buscar..." />
-      <select v-model="filters.status" @change="filters.page=1;load()" class="form-select form-select-sm">
-        <option value="">Todos</option><option value="1">Activo</option><option value="0">Inactivo</option>
-      </select>
-    </div>
-
-    <div class="data-table">
-      <table>
-        <thead><tr><th>#</th><th>Nombre</th><th>Dirección</th><th>Teléfono</th><th>Email</th><th>Estado</th><th>Acciones</th></tr></thead>
-        <tbody>
-          <tr v-if="loading"><td colspan="7" class="text-center py-4"><span class="spinner-sm" style="border-top-color:#1a73e8"></span></td></tr>
-          <tr v-else-if="!branches.length"><td colspan="7" class="text-center py-4 text-muted-sm">Sin sucursales</td></tr>
-          <tr v-for="b in branches" :key="b.id" v-else>
-            <td>{{ b.id }}</td>
-            <td><strong>{{ b.name }}</strong></td>
-            <td>{{ b.address }}</td>
-            <td>{{ b.phone }}</td>
-            <td>{{ b.email }}</td>
-            <td><span :class="b.status ? 'badge-active':'badge-inactive'">{{ b.status ? 'Activo':'Inactivo' }}</span></td>
-            <td>
-              <button class="icon-btn" @click="openEdit(b)"><i class="fa fa-edit"></i></button>
-              <button class="icon-btn" @click="toggleStatus(b)"><i :class="b.status?'fa fa-toggle-on text-success':'fa fa-toggle-off text-muted'"></i></button>
-              <button class="icon-btn text-danger" @click="deleteBranch(b)"><i class="fa fa-trash"></i></button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <div class="pagination-bar">
-        <span>Total: {{ meta.total || 0 }}</span>
-        <div class="d-flex gap-2">
-          <button class="btn btn-outline-secondary btn-sm" :disabled="filters.page<=1" @click="filters.page--;load()">‹</button>
-          <span>{{ filters.page }} / {{ meta.pages || 1 }}</span>
-          <button class="btn btn-outline-secondary btn-sm" :disabled="filters.page>=meta.pages" @click="filters.page++;load()">›</button>
-        </div>
+    <div class="d-flex align-center mb-6">
+      <div>
+        <h2 class="text-h5 font-weight-bold">Sucursales</h2>
+        <p class="text-body-2 text-medium-emphasis mb-0">Gestión de sucursales del gimnasio</p>
       </div>
+      <v-spacer />
+      <v-btn prepend-icon="mdi-plus" @click="openCreate">Nueva Sucursal</v-btn>
     </div>
 
-    <!-- Modal -->
-    <div v-if="showModal" class="modal-overlay" @click.self="showModal=false">
-      <div class="modal-box" style="width:600px">
-        <div class="modal-header">
-          <span>{{ editMode ? 'Editar Sucursal' : 'Nueva Sucursal' }}</span>
-          <button class="icon-btn" @click="showModal=false"><i class="fa fa-times"></i></button>
-        </div>
-        <div class="modal-body">
-          <div class="row g-3">
-            <div class="col-12"><label class="form-label">Nombre *</label><input v-model="form.name" class="form-control" /></div>
-            <div class="col-12"><label class="form-label">Dirección</label><input v-model="form.address" class="form-control" /></div>
-            <div class="col-6"><label class="form-label">Teléfono</label><input v-model="form.phone" class="form-control" /></div>
-            <div class="col-6"><label class="form-label">Email</label><input v-model="form.email" type="email" class="form-control" /></div>
-            <div class="col-6">
-              <label class="form-label">Estado</label>
-              <select v-model="form.status" class="form-select"><option :value="1">Activo</option><option :value="0">Inactivo</option></select>
-            </div>
-            <div class="col-12">
-              <label class="form-label">Horarios</label>
-              <table class="table table-sm table-bordered" v-if="form.schedule">
-                <thead><tr><th>Día</th><th>Apertura</th><th>Cierre</th><th>Activo</th></tr></thead>
-                <tbody>
-                  <tr v-for="(sch, day) in form.schedule" :key="day">
-                    <td class="text-capitalize">{{ day }}</td>
-                    <td><input v-model="sch.open" type="time" class="form-control form-control-sm" /></td>
-                    <td><input v-model="sch.close" type="time" class="form-control form-control-sm" /></td>
-                    <td class="text-center"><input type="checkbox" v-model="sch.active" /></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+    <v-card class="mb-4 pa-4" elevation="0" border>
+      <v-row dense>
+        <v-col cols="12" sm="5" md="4">
+          <v-text-field v-model="searchQuery" prepend-inner-icon="mdi-magnify" placeholder="Buscar sucursal..." clearable />
+        </v-col>
+        <v-col cols="12" sm="4" md="3">
+          <v-select
+            v-model="statusFilter"
+            :items="[{ title: 'Todos', value: null }, { title: 'Activo', value: 1 }, { title: 'Inactivo', value: 0 }]"
+            item-title="title"
+            item-value="value"
+            placeholder="Estado"
+          />
+        </v-col>
+      </v-row>
+    </v-card>
+
+    <v-card elevation="0" border>
+      <v-data-table :headers="headers" :items="branches" :loading="loading" :items-per-page="-1" hover>
+        <template #item.name="{ item }">
+          <div class="py-1">
+            <div class="font-weight-medium">{{ item.name }}</div>
+            <div v-if="item.email" class="text-caption text-medium-emphasis">{{ item.email }}</div>
           </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-light" @click="showModal=false">Cancelar</button>
-          <button class="btn btn-primary" :disabled="saving" @click="save">
-            <span v-if="saving" class="spinner-sm me-1"></span> {{ saving ? 'Guardando...' : 'Guardar' }}
-          </button>
-        </div>
-      </div>
-    </div>
+        </template>
+        <template #item.status="{ item }">
+          <v-chip :color="item.status ? 'success' : 'error'" variant="tonal" size="small">
+            {{ item.status ? 'Activo' : 'Inactivo' }}
+          </v-chip>
+        </template>
+        <template #item.actions="{ item }">
+          <v-btn icon="mdi-pencil-outline" variant="text" size="small" density="compact" @click="openEdit(item)" />
+          <v-btn
+            :icon="item.status ? 'mdi-toggle-switch' : 'mdi-toggle-switch-off-outline'"
+            :color="item.status ? 'success' : undefined"
+            variant="text"
+            size="small"
+            density="compact"
+            @click="toggleStatus(item)"
+          />
+          <v-btn icon="mdi-delete-outline" color="error" variant="text" size="small" density="compact" @click="deleteBranch(item)" />
+        </template>
+        <template #bottom>
+          <v-divider />
+          <div class="d-flex align-center justify-space-between pa-3">
+            <span class="text-caption text-medium-emphasis">Total: {{ meta.total || 0 }} sucursales</span>
+            <v-pagination v-model="page" :length="meta.pages || 1" density="compact" @update:model-value="load" />
+          </div>
+        </template>
+        <template #no-data>
+          <div class="text-center py-8 text-medium-emphasis">Sin sucursales</div>
+        </template>
+      </v-data-table>
+    </v-card>
+
+    <!-- Dialog -->
+    <v-dialog v-model="dialog" max-width="680" scrollable>
+      <v-card>
+        <v-card-title class="pa-5 pb-3">{{ editMode ? 'Editar Sucursal' : 'Nueva Sucursal' }}</v-card-title>
+        <v-divider />
+        <v-card-text class="pa-5" style="max-height: 72vh;">
+          <v-row dense>
+            <v-col cols="6"><v-text-field v-model="form.name" label="Nombre *" /></v-col>
+            <v-col cols="6"><v-text-field v-model="form.phone" label="Teléfono" /></v-col>
+            <v-col cols="12"><v-text-field v-model="form.address" label="Dirección" /></v-col>
+            <v-col cols="6"><v-text-field v-model="form.email" label="Email" type="email" /></v-col>
+            <v-col cols="6">
+              <v-select
+                v-model="form.status"
+                :items="[{ title: 'Activo', value: 1 }, { title: 'Inactivo', value: 0 }]"
+                item-title="title"
+                item-value="value"
+                label="Estado"
+              />
+            </v-col>
+            <v-col cols="12"><v-text-field v-model="form.description" label="Descripción" /></v-col>
+          </v-row>
+
+          <div class="text-subtitle-2 font-weight-medium mt-4 mb-2">Horario de atención</div>
+          <v-table density="compact" class="rounded border">
+            <thead>
+              <tr>
+                <th style="width:110px">Día</th>
+                <th class="text-center" style="width:80px">Abierto</th>
+                <th style="width:140px">Apertura</th>
+                <th style="width:140px">Cierre</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="day in scheduleKeys" :key="day">
+                <td class="text-body-2">{{ dayLabels[day] }}</td>
+                <td class="text-center">
+                  <v-checkbox v-model="form.schedule[day].active" density="compact" hide-details class="d-inline-flex" />
+                </td>
+                <td class="py-1 px-2">
+                  <v-text-field
+                    v-model="form.schedule[day].open"
+                    type="time"
+                    density="compact"
+                    hide-details
+                    :disabled="!form.schedule[day].active"
+                  />
+                </td>
+                <td class="py-1 px-2">
+                  <v-text-field
+                    v-model="form.schedule[day].close"
+                    type="time"
+                    density="compact"
+                    hide-details
+                    :disabled="!form.schedule[day].active"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </v-table>
+        </v-card-text>
+        <v-divider />
+        <v-card-actions class="pa-4">
+          <v-spacer />
+          <v-btn variant="text" color="default" @click="dialog = false">Cancelar</v-btn>
+          <v-btn :loading="saving" @click="save">{{ editMode ? 'Actualizar' : 'Crear' }}</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>

@@ -1,14 +1,19 @@
 import axios from 'axios'
 import { useAuthStore } from '@/stores/auth'
+import { startBar, finishBar } from '@/utils/loadingBar'
 
 const api = axios.create({
   baseURL: '/api/v1',
   headers: { 'Content-Type': 'application/json' },
 })
 
+let _pending = 0
+
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token')
   if (token) config.headers.Authorization = `Bearer ${token}`
+  _pending++
+  if (_pending === 1) startBar()
   return config
 })
 
@@ -21,8 +26,15 @@ const processQueue = (error, token = null) => {
 }
 
 api.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    _pending = Math.max(0, _pending - 1)
+    if (_pending === 0) finishBar()
+    return res
+  },
   async (error) => {
+    _pending = Math.max(0, _pending - 1)
+    if (_pending === 0) finishBar()
+
     const original = error.config
 
     if (error.response?.status === 401 && !original._retry) {
