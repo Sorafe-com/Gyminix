@@ -50,8 +50,11 @@ function formatDate(dt) {
 async function load() {
   loading.value = true
   try {
+    const activeFilters = Object.fromEntries(
+      Object.entries(filters.value).filter(([, v]) => v !== '' && v !== null)
+    )
     const { data } = await auditApi.list({
-      ...filters.value,
+      ...activeFilters,
       page:     page.value,
       per_page: perPage.value,
     })

@@ -34,14 +34,15 @@ async function load() {
   loading.value = true
   try {
     const { data } = await gymsApi.list({
-      search:   debouncedSearch.value,
-      status:   statusFilter.value ?? '',
+      search:   debouncedSearch.value || undefined,
+      status:   statusFilter.value !== null ? statusFilter.value : undefined,
       page:     page.value,
       per_page: perPage.value,
     })
     gyms.value = data.data ?? []
     meta.value = data.meta ?? {}
   } catch (e) {
+    console.error('[GymsView] Error:', e)
     toast.error(e.response?.data?.message || e.message || 'Error al cargar gimnasios')
   } finally { loading.value = false }
 }

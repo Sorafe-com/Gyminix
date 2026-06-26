@@ -42,8 +42,10 @@ async function load() {
   loading.value = true
   try {
     const { data } = await branchesApi.list({
-      search: debouncedSearch.value, status: statusFilter.value ?? '',
-      page: page.value, per_page: perPage.value,
+      search:   debouncedSearch.value || undefined,
+      status:   statusFilter.value !== null ? statusFilter.value : undefined,
+      page:     page.value,
+      per_page: perPage.value,
     })
     branches.value = data.data ?? []
     meta.value     = data.meta ?? {}

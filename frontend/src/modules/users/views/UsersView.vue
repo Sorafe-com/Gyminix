@@ -42,7 +42,13 @@ watch([debouncedSearch, roleFilter, statusFilter], () => { page.value = 1; load(
 async function load() {
   loading.value = true
   try {
-    const u = await usersApi.list({ search: debouncedSearch.value, role_id: roleFilter.value ?? '', status: statusFilter.value ?? '', page: page.value, per_page: perPage.value })
+    const u = await usersApi.list({
+      search:   debouncedSearch.value || undefined,
+      role_id:  roleFilter.value !== null ? roleFilter.value : undefined,
+      status:   statusFilter.value !== null ? statusFilter.value : undefined,
+      page:     page.value,
+      per_page: perPage.value,
+    })
     users.value = u.data.data ?? []
     meta.value  = u.data.meta ?? {}
     try {
