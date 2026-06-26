@@ -30,13 +30,29 @@ async function load() {
   loading.value = true
   try {
     const [r, p] = await Promise.all([rolesApi.list(), rolesApi.permissions()])
-    roles.value    = r.data.data ?? []
-    allPerms.value = p.data.data ?? []
-    const mods = [...new Set(allPerms.value.map(p => p.module))]
-    modules.value = mods.map(m => ({
-      name: m,
-      permissions: allPerms.value.filter(p => p.module === m),
-    }))
+    roles.value = Array.isArray(r.data.data) ? r.data.data : []
+
+    // Backend may return permissions as flat array OR grouped object { module: [...] }
+    const raw = p.data.data
+    if (Array.isArray(raw)) {
+      allPerms.value = raw
+      const mods = [...new Set(raw.map(x => x.module))]
+      modules.value = mods.map(m => ({ name: m, permissions: raw.filter(x => x.module === m) }))
+    } else if (raw && typeof raw === 'object') {
+      const flat = Object.entries(raw).flatMap(([mod, perms]) =>
+        Array.isArray(perms) ? perms.map(x => ({ ...x, module: x.module ?? mod })) : []
+      )
+      allPerms.value = flat
+      modules.value = Object.entries(raw)
+        .filter(([, perms]) => Array.isArray(perms) && perms.length)
+        .map(([mod, perms]) => ({
+          name: mod,
+          permissions: perms.map(x => ({ ...x, module: x.module ?? mod })),
+        }))
+    } else {
+      allPerms.value = []
+      modules.value  = []
+    }
   } catch (e) {
     toast.error(e.response?.data?.message || e.message || 'Error al cargar roles')
   } finally { loading.value = false }
@@ -57,7 +73,8 @@ async function openPermissions(role) {
   rolePerms.value    = []
   permDialog.value   = true
   const { data } = await rolesApi.getRolePerms(role.id)
-  rolePerms.value = (data.data || []).map(p => p.id)
+  const rp = data.data
+  rolePerms.value = Array.isArray(rp) ? rp.map(p => p.id) : []
 }
 
 async function save() {

@@ -26,7 +26,17 @@ const grouped = computed(() => {
 onMounted(async () => {
   try {
     const { data } = await rolesApi.permissions()
-    permissions.value = data.data ?? []
+    const raw = data.data
+    if (Array.isArray(raw)) {
+      permissions.value = raw
+    } else if (raw && typeof raw === 'object') {
+      // Backend returns { module: [...perms] }
+      permissions.value = Object.entries(raw).flatMap(([mod, perms]) =>
+        Array.isArray(perms) ? perms.map(p => ({ ...p, module: p.module ?? mod })) : []
+      )
+    } else {
+      permissions.value = []
+    }
   } catch (e) {
     console.error('Permissions load error:', e)
   } finally { loading.value = false }
