@@ -31,13 +31,12 @@
   border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
 }
 
-/* Login page gradient background */
+/* Login layout wrapper (background handled in LoginView scoped styles) */
 .auth-wrapper {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #1e2a3a 0%, #1a73e8 100%);
 }
 
 /* Stat card gradient icons */
