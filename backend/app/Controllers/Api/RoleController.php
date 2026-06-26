@@ -27,7 +27,8 @@ class RoleController extends BaseApiController
     )]
     public function index()
     {
-        $roles = $this->roleService->listRoles($this->getGymId());
+        $gymId = $this->isSuperAdmin() ? null : $this->getGymId();
+        $roles = $this->roleService->listRoles($gymId);
         return ApiResponse::success($roles);
     }
 

@@ -26,7 +26,9 @@ const grouped = computed(() => {
 onMounted(async () => {
   try {
     const { data } = await rolesApi.permissions()
-    permissions.value = data.data
+    permissions.value = data.data ?? []
+  } catch (e) {
+    console.error('Permissions load error:', e)
   } finally { loading.value = false }
 })
 </script>

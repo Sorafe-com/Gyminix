@@ -18,7 +18,7 @@ class BranchService
 
     public function listByGym(int $gymId, array $filters = [], int $page = 1, int $perPage = 15): array
     {
-        $builder = $this->branchModel->builder('b');
+        $builder = $this->branchModel->db->table('branches b');
         $builder->select('b.*, u.first_name, u.last_name')
             ->join('users u', 'u.id = b.manager_id', 'left')
             ->where('b.gym_id', $gymId)

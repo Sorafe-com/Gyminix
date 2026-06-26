@@ -30,13 +30,15 @@ async function load() {
   loading.value = true
   try {
     const [r, p] = await Promise.all([rolesApi.list(), rolesApi.permissions()])
-    roles.value    = r.data.data
-    allPerms.value = p.data.data
+    roles.value    = r.data.data ?? []
+    allPerms.value = p.data.data ?? []
     const mods = [...new Set(allPerms.value.map(p => p.module))]
     modules.value = mods.map(m => ({
       name: m,
       permissions: allPerms.value.filter(p => p.module === m),
     }))
+  } catch (e) {
+    toast.error(e.response?.data?.message || e.message || 'Error al cargar roles')
   } finally { loading.value = false }
 }
 

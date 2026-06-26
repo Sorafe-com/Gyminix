@@ -39,8 +39,10 @@ async function load() {
       page:     page.value,
       per_page: perPage.value,
     })
-    gyms.value = data.data
-    meta.value = data.meta
+    gyms.value = data.data ?? []
+    meta.value = data.meta ?? {}
+  } catch (e) {
+    toast.error(e.response?.data?.message || e.message || 'Error al cargar gimnasios')
   } finally { loading.value = false }
 }
 

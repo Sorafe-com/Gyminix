@@ -45,8 +45,10 @@ async function load() {
       search: debouncedSearch.value, status: statusFilter.value ?? '',
       page: page.value, per_page: perPage.value,
     })
-    branches.value = data.data
-    meta.value     = data.meta
+    branches.value = data.data ?? []
+    meta.value     = data.meta ?? {}
+  } catch (e) {
+    toast.error(e.response?.data?.message || e.message || 'Error al cargar sucursales')
   } finally { loading.value = false }
 }
 

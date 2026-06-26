@@ -35,7 +35,7 @@ class AuditController extends BaseApiController
     )]
     public function index()
     {
-        $builder = $this->auditModel->builder('al');
+        $builder = $this->auditModel->db->table('audit_logs al');
         $builder->select('al.*, u.first_name, u.last_name, u.email')
             ->join('users u', 'u.id = al.user_id', 'left')
             ->orderBy('al.created_at', 'DESC');

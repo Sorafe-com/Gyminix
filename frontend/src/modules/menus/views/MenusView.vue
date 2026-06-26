@@ -42,8 +42,10 @@ async function load() {
   loading.value = true
   try {
     const [t, l] = await Promise.all([menusApi.tree(), menusApi.list()])
-    tree.value    = t.data.data
-    flatList.value = l.data.data
+    tree.value     = t.data.data ?? []
+    flatList.value = l.data.data ?? []
+  } catch (e) {
+    toast.error(e.response?.data?.message || e.message || 'Error al cargar menús')
   } finally { loading.value = false }
 }
 

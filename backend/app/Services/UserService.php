@@ -16,14 +16,16 @@ class UserService
         $this->auditModel = new AuditLogModel();
     }
 
-    public function list(int $gymId, array $filters = [], int $page = 1, int $perPage = 15): array
+    public function list(?int $gymId, array $filters = [], int $page = 1, int $perPage = 15): array
     {
-        $builder = $this->userModel->builder('u');
+        $builder = $this->userModel->db->table('users u');
         $builder->select('u.id, u.gym_id, u.branch_id, u.role_id, u.first_name, u.last_name, u.email, u.username, u.phone, u.avatar, u.is_super_admin, u.status, u.last_login, u.created_at, r.name as role_name, b.name as branch_name')
             ->join('roles r', 'r.id = u.role_id', 'left')
             ->join('branches b', 'b.id = u.branch_id', 'left')
-            ->where('u.gym_id', $gymId)
             ->where('u.deleted_at IS NULL');
+        if ($gymId !== null) {
+            $builder->where('u.gym_id', $gymId);
+        }
 
         if (!empty($filters['search'])) {
             $builder->groupStart()

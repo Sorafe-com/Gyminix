@@ -42,13 +42,15 @@ watch([debouncedSearch, roleFilter, statusFilter], () => { page.value = 1; load(
 async function load() {
   loading.value = true
   try {
-    const [u, r] = await Promise.all([
-      usersApi.list({ search: debouncedSearch.value, role_id: roleFilter.value ?? '', status: statusFilter.value ?? '', page: page.value, per_page: perPage.value }),
-      rolesApi.list(),
-    ])
-    users.value = u.data.data
-    meta.value  = u.data.meta
-    roles.value = r.data.data
+    const u = await usersApi.list({ search: debouncedSearch.value, role_id: roleFilter.value ?? '', status: statusFilter.value ?? '', page: page.value, per_page: perPage.value })
+    users.value = u.data.data ?? []
+    meta.value  = u.data.meta ?? {}
+    try {
+      const r = await rolesApi.list()
+      roles.value = r.data.data ?? []
+    } catch {}
+  } catch (e) {
+    toast.error(e.response?.data?.message || e.message || 'Error al cargar usuarios')
   } finally { loading.value = false }
 }
 

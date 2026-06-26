@@ -22,9 +22,20 @@ class RoleService
         $this->auditModel = new AuditLogModel();
     }
 
-    public function listRoles(int $gymId): array
+    public function listRoles(?int $gymId): array
     {
-        return $this->roleModel->where('gym_id', $gymId)->orWhere('gym_id IS NULL')->where('deleted_at IS NULL')->findAll();
+        if ($gymId === null) {
+            return $this->roleModel->db->table('roles')
+                ->where('deleted_at IS NULL')
+                ->get()->getResultArray();
+        }
+        return $this->roleModel->db->table('roles')
+            ->groupStart()
+                ->where('gym_id', $gymId)
+                ->orWhere('gym_id IS NULL')
+            ->groupEnd()
+            ->where('deleted_at IS NULL')
+            ->get()->getResultArray();
     }
 
     public function createRole(array $data, int $gymId, int $actorId): array

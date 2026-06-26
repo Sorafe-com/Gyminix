@@ -34,7 +34,9 @@ class UserController extends BaseApiController
     )]
     public function index()
     {
-        $gymId   = $this->getGymId();
+        $gymId   = $this->isSuperAdmin()
+            ? ($this->request->getVar('gym_id') !== null ? (int) $this->request->getVar('gym_id') : null)
+            : $this->getGymId();
         $filters = [
             'search'  => $this->request->getVar('search'),
             'status'  => $this->request->getVar('status'),

@@ -55,8 +55,10 @@ async function load() {
       page:     page.value,
       per_page: perPage.value,
     })
-    logs.value = data.data
-    meta.value = data.meta
+    logs.value = data.data ?? []
+    meta.value = data.meta ?? {}
+  } catch (e) {
+    toast.error(e.response?.data?.message || e.message || 'Error al cargar registros')
   } finally { loading.value = false }
 }
 
