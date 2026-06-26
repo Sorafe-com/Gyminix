@@ -5,6 +5,7 @@ export const rolesApi = {
   create:           (data) => api.post('/roles', data),
   update:           (id, data) => api.put(`/roles/${id}`, data),
   delete:           (id) => api.delete(`/roles/${id}`),
+  toggleStatus:     (id) => api.patch(`/roles/${id}/status`),
   permissions:      () => api.get('/permissions'),
   getRolePerms:     (id) => api.get(`/roles/${id}/permissions`),
   syncPermissions:  (id, ids) => api.post(`/roles/${id}/permissions/sync`, { permission_ids: ids }),

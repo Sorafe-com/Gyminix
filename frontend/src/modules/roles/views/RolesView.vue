@@ -29,7 +29,7 @@ const headers = [
 async function load() {
   loading.value = true
   try {
-    const [r, p] = await Promise.all([rolesApi.list(), rolesApi.listPermissions()])
+    const [r, p] = await Promise.all([rolesApi.list(), rolesApi.permissions()])
     roles.value    = r.data.data
     allPerms.value = p.data.data
     const mods = [...new Set(allPerms.value.map(p => p.module))]
@@ -50,10 +50,12 @@ function openEdit(role) {
   editMode.value = true; dialog.value = true
 }
 
-function openPermissions(role) {
+async function openPermissions(role) {
   selectedRole.value = role
-  rolePerms.value    = role.permissions?.map(p => p.id) || []
+  rolePerms.value    = []
   permDialog.value   = true
+  const { data } = await rolesApi.getRolePerms(role.id)
+  rolePerms.value = (data.data || []).map(p => p.id)
 }
 
 async function save() {
@@ -75,7 +77,7 @@ async function save() {
 async function savePermissions() {
   savingPerms.value = true
   try {
-    await rolesApi.syncPermissions(selectedRole.value.id, { permissions: rolePerms.value })
+    await rolesApi.syncPermissions(selectedRole.value.id, rolePerms.value)
     toast.success('Permisos sincronizados')
     permDialog.value = false; load()
   } catch (e) {
